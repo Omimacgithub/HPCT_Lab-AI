@@ -2,3 +2,5 @@ tensorflow[and-cuda]==2.17.0
 torch==2.4.1
 datasets==3.0.0
 transformers==4.44.2
+tensorboard-plugin-profile==2.17.0
+pytorch-lightning==2.4.0
