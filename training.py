@@ -21,25 +21,25 @@ model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased")
 
 #SQUAD train dataset has 87599 rows
 print("Loading half of the train dataset... It may take a while")
-train_dataloader = DataLoader(tokenized_datasets["train"], batch_size=128, collate_fn=default_data_collator)
+train_dataloader = DataLoader(tokenized_datasets["train"], batch_size=156, collate_fn=default_data_collator)
 #For freeing GPU memory
 del tokenized_datasets
 
-"""
+
 args = TrainingArguments(
     "finetune-BERT-squad",
     #eval_strategy="epoch",
     learning_rate=2e-5,
     per_device_train_batch_size=64,
     #per_device_eval_batch_size=8,
-    #num_train_epochs=125,
+    num_train_epochs=1000,
     weight_decay=0.01,
 )
-"""
+
 
 trainer = Trainer(
     model=model,
-    #args=args,
+    args=args,
     #train_dataset=tokenized_datasets["train"].select(range(1000)),
     #eval_dataset=tokenized_datasets["validation"].select(range(100)),
     #data_collator=data_collator,

@@ -33,6 +33,16 @@ El modelo computa su respectivo start\_position y end\_position de la que cree q
 
 **NOTA:** la visualización de la información de profiling en tensorboard **no está soportada para el navegador Safari**.
 
+Para crear el venv y lanzar el trabajo para entrenar el modelo ejecutamos el script **createnv.sh**:
+
+~~~shell
+./createnv.sh
+~~~
+
+La ejecución devuelve un fichero .out que contiene la duración en minutos del entrenamiento y un directorio **runs/BERTSQUAD** con la información de profiling.
+
+### Check training profile data
+
 **En el directorio del repositorio** ejecutamos tensorboard con los datos generados:
 
 ~~~shell

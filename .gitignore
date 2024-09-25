@@ -3,3 +3,5 @@ __pycache__
 tokenized_dataset/
 runs
 train-v2.0.json
+slurm*
+mypython/
