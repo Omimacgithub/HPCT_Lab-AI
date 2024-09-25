@@ -29,6 +29,13 @@ Adicionalmente, añadimos 2 entradas más que el modelo usará para calcular el 
 
 El modelo computa su respectivo start\_position y end\_position de la que cree que es la respuesta correcta y los compara con los 2 valores que se pasan como entradas (calcula la pérdida).
 
+## Explanation of the code
+
+El entrenamiento se divide en 2 ficheros:
+
+- tokenize_squad.py: fichero que descarga el dataset y lo tokeniza para usarlo en el modelo de BERT.
+- training.py: ejecuta el entrenamiento con el modelo de BERT y genera información de profiling del mismo.
+
 ## How to run it?
 
 **NOTA:** la visualización de la información de profiling en tensorboard **no está soportada para el navegador Safari**.
@@ -46,11 +53,11 @@ La ejecución devuelve un fichero .out que contiene la duración en minutos del 
 **En el directorio del repositorio** ejecutamos tensorboard con los datos generados:
 
 ~~~shell
-tensorboard --logdir=./runs --bind\_all &
+tensorboard --logdir=./runs --bind_all &
 ~~~
 
 Accedemos desde el navegador web a la sección de profiling en tensorboard:
 
 ~~~shell
-http://\<IP\_del\_nodo\>:6006/#pytorch\_profiler
+http://<IP_del_nodo>:6006/#pytorch_profiler
 ~~~
