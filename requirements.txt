@@ -2,3 +2,4 @@ torch==2.4.1
 datasets==3.0.0
 transformers==4.44.2
 torch-tb-profiler==0.4.3
+accelerate==0.34.2
