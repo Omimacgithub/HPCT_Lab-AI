@@ -110,6 +110,10 @@ Al entrar en tensorboard podemos ver un resumen del entrenamiento. Se detalla in
 
 ![image](https://github.com/user-attachments/assets/fb66ecba-5943-483a-8c1d-39f53a216e2a)
 
+La sección Operator muestra el tiempo de ejecución de cada operación de Pytorch en el host y/o en el dispositivo.
+
+![image](https://github.com/user-attachments/assets/03bfbf50-8c27-4c94-93ef-99206b83bde4)
+
 
 El apartado GPU kernel muestra el tiempo de ejecución de cada kernel en la GPU y si ha utilizado algún tensor core (en este caso ningún kernel los ha empleado).
 
@@ -118,3 +122,7 @@ El apartado GPU kernel muestra el tiempo de ejecución de cada kernel en la GPU 
 El apartado Trace devuelve información relacionada con el instante de ejecución de cada función del código por cada step del entrenamiento. En la captura se observa que el tiempo consumido por la función torch.cuda.empty_cache() es mayor que el tiempo total del entrenamiento en cada step.
 
 ![image](https://github.com/user-attachments/assets/6a5f1fa4-00dd-41ff-9ac4-3117c36c47d7)
+
+El apartado Module devuelve las llamadas al modelo a entrenar. En este caso aparece que se ha llamado 3 veces (3 ocurrencias, 1 por step) ya que hemos grabado sólo 3 pasos del entrenamiento, pero en realidad las ocurrencias del modelo fueron el nº total de steps del bucle de entrenamiento (**num_epochs * dataset_rows/batch_size**).
+
+![image](https://github.com/user-attachments/assets/96918168-960a-4d5d-a79a-7ebfd97f47e6)
