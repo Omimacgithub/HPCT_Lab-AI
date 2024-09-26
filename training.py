@@ -1,4 +1,5 @@
 import time
+import torch
 import torch.cuda
 from torch.utils.data import DataLoader
 import torch.profiler
@@ -15,12 +16,15 @@ except FileNotFoundError:
     print(
         f"Tokenized dataset not found at {TOKENIZED_PATH}. Running tokenize-squad.py..."
     )
-    tokenized_datasets = get_tokenized_datasets()
+    get_tokenized_datasets()
+    tokenized_datasets = load_from_disk(TOKENIZED_PATH)
 
-model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased")
+#Moving model to GPU
+device = torch.device("cuda:0")
+model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased").cuda(device)
 
 #SQUAD train dataset has 87599 rows
-train_dataloader = DataLoader(tokenized_datasets["train"], batch_size=128, collate_fn=default_data_collator)
+train_dataloader = DataLoader(tokenized_datasets["train"], batch_size=128, collate_fn=default_data_collator, num_workers=1)
 #For freeing GPU memory
 del tokenized_datasets
 

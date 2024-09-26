@@ -3,17 +3,14 @@ from transformers import AutoTokenizer
 
 TOKENIZED_PATH = "tokenized_dataset"
 
-# Load the dataset
-squad = load_dataset("squad")
-
-# Load the tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-
-
 def prepare_train_features(examples):
     # Tokenize our examples with truncation and padding, but keep the overflows using a stride.
     # This results in one example possible giving several features when a context is long,
     # each of those features having a context that overlaps a bit the context of the previous feature.
+
+    # Load the tokenizer and model
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
     tokenized_examples = tokenizer(
         examples["question"],
         examples["context"],
@@ -90,12 +87,14 @@ def prepare_train_features(examples):
 
 
 def get_tokenized_datasets():
+    # Load the dataset
+    squad = load_dataset("squad")
+
     tokenized_datasets = squad.map(
         prepare_train_features, batched=True, remove_columns=squad["train"].column_names
     )
 
     tokenized_datasets.save_to_disk(TOKENIZED_PATH)
-
 
 if __name__ == "__main__":
     get_tokenized_datasets()
