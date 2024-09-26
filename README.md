@@ -103,3 +103,18 @@ Si queremos salir del venv:
 ~~~shell
 deactivate
 ~~~
+
+## Profiling outputs
+
+Al entrar en tensorboard podemos ver un resumen del entrenamiento. Se detalla información como la GPU utiliza (en este caso una NVIDIA A100) y su uso en % (89.82 en este caso), la duración de cada step desglosada en varias categorías (vemos como la ejecución de los kernels en la GPU fué lo más costoso con diferencia). Adicionalmente la herramienta otorga recomendaciones para mejorar el rendimiento del entrenamiento (como puede verse en la parte inferior para este entrenamiento no hay ninguna recomendación disponible.
+
+![image](https://github.com/user-attachments/assets/fb66ecba-5943-483a-8c1d-39f53a216e2a)
+
+
+El apartado GPU kernel muestra el tiempo de ejecución de cada kernel en la GPU y si ha utilizado algún tensor core (en este caso ningún kernel los ha empleado).
+
+![image](https://github.com/user-attachments/assets/af6fbf49-d999-4de3-bc6c-fed5f4905c39)
+
+El apartado Trace devuelve información relacionada con el instante de ejecución de cada función del código por cada step del entrenamiento. En la captura se observa que el tiempo consumido por la función torch.cuda.empty_cache() es mayor que el tiempo total del entrenamiento en cada step.
+
+![image](https://github.com/user-attachments/assets/6a5f1fa4-00dd-41ff-9ac4-3117c36c47d7)
