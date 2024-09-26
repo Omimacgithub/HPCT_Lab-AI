@@ -20,7 +20,6 @@ def prepare_train_features(examples):
         truncation="only_second",  # truncate context, not the question
         max_length=384,
         stride=128,
-        return_tensors='pt',
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
         padding="max_length",
