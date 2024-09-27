@@ -24,16 +24,18 @@ device = torch.device("cuda:0")
 model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased").cuda(device)
 
 #SQUAD train dataset has 87599 rows
-train_dataloader = DataLoader(tokenized_datasets["train"], batch_size=128, collate_fn=default_data_collator, num_workers=1)
+train_dataloader = DataLoader(tokenized_datasets["train"].select(range(1500)), batch_size=150, collate_fn=default_data_collator, num_workers=1)
+num_steps = len(train_dataloader)
 #For freeing GPU memory
 del tokenized_datasets
 
 
 args = TrainingArguments(
-    "finetune-BERT-squad",
+    output_dir="finetune-BERT-squad",
     #eval_strategy="epoch",
     learning_rate=2e-5,
-    per_device_train_batch_size=128,
+    gradient_accumulation_steps=1,
+    per_device_train_batch_size=150,
     #per_device_eval_batch_size=8,
     #num_train_epochs=1000,
     weight_decay=0.01,
@@ -48,28 +50,39 @@ trainer = Trainer(
     #data_collator=data_collator,
     #tokenizer=tokenizer,
 )
-
+"""
 prof = torch.profiler.profile(
-        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=1),
+        #activities=[
+        #torch.profiler.ProfilerActivity.CUDA,
+        #],
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=5, repeat=1),
         on_trace_ready=torch.profiler.tensorboard_trace_handler('./runs/BERTSQUAD'),
         record_shapes=True,
         with_stack=True)
-
-num_epochs = 10 
-
+"""
+#trainer.set_training(gradient_accumulation_steps=100)
+num_epochs = 6
+print("------------------------------------------------------------")
+print("---------------------TRAINING START-------------------------")
+print("------------------------------------------------------------")
 start_time = time.time()
-prof.start()
 for epoch in range(num_epochs):
-    #if(epoch == 0 or epoch == (num_epochs-1)):
+    prof = torch.profiler.profile(
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=1),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler('./runs/BERT EPOCH ' + str(epoch)),
+        record_shapes=True,
+        with_stack=True)
+    prof.start()
     for step, batch_data in enumerate(train_dataloader):
-            prof.step()  # Need to call this at each step to notify profiler of steps' boundary.
-            if step >= 1 + 1 + 3:
-                break
-            trainer.training_step(model, batch_data)
-            #For freeing GPU memory
-            torch.cuda.empty_cache()
-prof.stop()
+        prof.step()  # Need to call this at each step to notify profiler of steps' boundary.
+        loss = trainer.training_step(model, batch_data)
+        print(f"Loss: {loss:.4f}, step: {step}/{num_steps}, epoch: {epoch}")
+        #For freeing GPU memory
+        torch.cuda.empty_cache()
+    prof.stop()
+    del prof
 end_time = time.time()
 execution_time = (end_time - start_time)/60
 print(f"Execution time: {execution_time:.4f} minutes")
-
+#Save model
+#trainer.save_model()

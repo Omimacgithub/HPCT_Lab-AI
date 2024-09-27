@@ -89,7 +89,7 @@ La ejecución devuelve un fichero .out que contiene la duración en minutos del 
 
 ~~~shell
 source ./mypython/bin/activate
-tensorboard --logdir=./runs --bind_all &
+tensorboard --logdir=./runs --host `hostname -i` &
 ~~~
 
 Accedemos desde el navegador web a la sección de profiling en tensorboard:
