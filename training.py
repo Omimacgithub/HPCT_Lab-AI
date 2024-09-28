@@ -33,11 +33,11 @@ del tokenized_datasets
 args = TrainingArguments(
     output_dir="finetune-BERT-squad",
     #eval_strategy="epoch",
-    learning_rate=2e-5,
+    learning_rate=0.01,#2e-5,
     gradient_accumulation_steps=1,
     per_device_train_batch_size=150,
     #per_device_eval_batch_size=8,
-    #num_train_epochs=1000,
+    num_train_epochs=1,
     weight_decay=0.01,
 )
 
@@ -61,7 +61,7 @@ prof = torch.profiler.profile(
         with_stack=True)
 """
 #trainer.set_training(gradient_accumulation_steps=100)
-num_epochs = 6
+num_epochs = 3
 print("------------------------------------------------------------")
 print("---------------------TRAINING START-------------------------")
 print("------------------------------------------------------------")
@@ -77,10 +77,14 @@ for epoch in range(num_epochs):
         prof.step()  # Need to call this at each step to notify profiler of steps' boundary.
         loss = trainer.training_step(model, batch_data)
         print(f"Loss: {loss:.4f}, step: {step}/{num_steps}, epoch: {epoch}")
+        for key in batch_data:
+            batch_data[key].detach()
         #For freeing GPU memory
         torch.cuda.empty_cache()
     prof.stop()
     del prof
+#Ensure all operations have completed when using CUDA
+torch.cuda.synchronize()
 end_time = time.time()
 execution_time = (end_time - start_time)/60
 print(f"Execution time: {execution_time:.4f} minutes")
