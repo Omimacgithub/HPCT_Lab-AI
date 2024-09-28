@@ -1,4 +1,5 @@
 import pytorch_lightning as L
+import time
 import torch
 import torch.nn.functional as F
 from datasets import load_from_disk
@@ -21,6 +22,7 @@ except FileNotFoundError:
         f"Tokenized dataset not found at {TOKENIZED_PATH}. Running tokenize-squad.py..."
     )
     tokenized_datasets = get_tokenized_datasets()
+    tokenized_datasets = load_from_disk(TOKENIZED_PATH)
 
 bert_model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased")
 
@@ -83,7 +85,8 @@ class LanguageModel(L.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        return AdamW(self.parameters(), lr=2e-5)
+        #return AdamW(self.parameters(), lr=2e-5)
+        return torch.optim.SGD(self.parameters(), lr=0.01)
 
 
 def main():
@@ -100,7 +103,7 @@ def main():
         tokenized_datasets = load_from_disk(TOKENIZED_PATH)
 
     # Split data into train, val, test
-    train_dataset = tokenized_datasets["train"].select(range(2000))
+    train_dataset = tokenized_datasets["train"].select(range(22500))
     val_dataset = tokenized_datasets["validation"].select(range(200))
     test_dataset = tokenized_datasets["validation"].select(range(5000, 5200))
 
@@ -108,7 +111,7 @@ def main():
     data_collator = DefaultDataCollator()
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=8, shuffle=True, collate_fn=data_collator
+        train_dataset, batch_size=150, shuffle=True, collate_fn=data_collator
     )
     val_dataloader = DataLoader(
         val_dataset, batch_size=8, shuffle=False, collate_fn=data_collator
@@ -127,7 +130,7 @@ def main():
     profiler = PyTorchProfiler(
         dirpath="l_runs/bert_lightning",
         filename="profiler",
-        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=5, repeat=2),
         on_trace_ready=torch.profiler.tensorboard_trace_handler(
             "l_runs/bert_lightning"
         ),
@@ -140,14 +143,22 @@ def main():
     trainer = L.Trainer(
         accelerator="gpu",
         devices=1,
-        gradient_clip_val=0.25,
-        max_epochs=3,
+        #gradient_clip_val=0.25,
+        max_epochs=6,
         logger=logger,  # Add the logger here
         profiler=profiler,  # Add the profiler here
+        default_root_dir="finetune-l-BERT-squad"
     )
+    start_time = time.time()
     trainer.fit(model, train_dataloader, val_dataloader)
+    end_time = time.time()
+    execution_time = (end_time - start_time)/60
+    print("------------------------------------------------------------")
+    print(f"Execution time: {execution_time:.4f} minutes")
+    print("------------------------------------------------------------")
     trainer.test(model, test_dataloader)
-
+    #Save model
+    trainer.save_checkpoint("finetune-l-BERT-squad/BERT_checkpoint.ckpt")
 
 if __name__ == "__main__":
     main()
