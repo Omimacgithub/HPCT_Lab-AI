@@ -37,14 +37,16 @@ El entrenamiento se divide en 2 ficheros:
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/tokenize_squad.py#L91
 
+-
 	- Transforma (tokeniza) los campos "question" y "context" en input\_ids válidos para el modelo de BERT (dado que la información del context puede ser demasiado extensa y el tamaño de los input\_ids de BERT es limitado, es necesario fragmentarla en varios inputs\_ids).
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/tokenize_squad.py#L12-L23
 
+-
 	- Computa los campos start\_position y end\_position que serán usados por BERT para calcular el valor de loss.
 
 
-
+-
 	- Devuelve un objeto datasets.arrow\_dataset.Dataset con todas las entradas necesarias para el modelo y lo guarda en un fichero.
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/tokenize_squad.py#L93-L97
@@ -55,23 +57,28 @@ https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L35-L38
 
+-
   		- training\_step: Devuelve el valor de pérdida generado en el step de entrenamiento. Llama a la función forward, que devuelve las salidas generadas por el modelo (start\_logits y end\_logits), de las que se calcula el valor de pérdida respecto a las salidas esperadas (start\_positions y end\_positions). Al usar pytorch\_lightning no es necesario declarar métodos como optimizer.step() o optimizer.zero_grad() en el entrenamiento.
  
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L40-L54
 
+-
 		- validation_step y test_step en caso de que se quiera realizar estas fases, ejecutan el mismo código que la fase de training.
   		- configure_optimizers: devuelve los optimizadores que se usarán en el entrenamiento (sólo SGD) y los schedulers que modifican el valor del learning rate (en este caso ninguno).
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L87C9-L89
 
+-
 	- Carga el Dataset creado del anterior archivo .py (o genera uno si no está creado).
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L95-L103
 
+-
 	- Carga el Dataset en un objeto DataLoader para poder iterarlo en batches.
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L111-L121
 
+-
 	- Crea un objeto PyTorchProfiler con los argumentos necesarios:
 		- **schedule:** decide que acción del profiler ejecutar en cada paso (step)
 			- wait: el profiler se deshabilita
@@ -82,6 +89,7 @@ https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L130-L140
 
+-
 	- Ejecuta el bucle de entrenamiento al mismo tiempo que guarda la información de profiling.
 
 
@@ -131,16 +139,20 @@ Se recogen 2 salidas del entrenamiento de BERT, 1 salida usando la optimización
 	- Tamaño de batch de 8 (200/8 = 25 steps)
  - 6 epochs.
 
-(Los tiempos de los epochs no tienen sentido, 1 Epoch = 43 minutos????)
+| Optimizers | Step 0      | Step 1      | Step 2      | Step 3      | Step 4      | Step 5      | Avg step     | Avg epoch (150 steps)   | Total exc    |
+| ---------- | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ |
+| AdamW      | 2607,112 ms | 2115,140 ms | 2106,955 ms | 2107,439 ms | 2109,853 ms | 2110,829 ms | 2192,888 ms | 5,48222 mins | 33,2294 mins |
+| SGD        | 2505,104 ms  | 2145,509 ms | 2135,011 ms | 2138,431 ms | 2140,558 ms | 2142,426 ms | 2201,173 ms | 5,5029325 mins | 33,0592 mins |
 
-| Optimizers | Epoch 0      | Epoch 1      | Epoch 2      | Epoch 3      | Epoch 4      | Epoch 5      | Avg step     | Total exc    |
-| ---------- | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ |
-| AdamW      | 2.607.112 ms | 2.115.140 ms | 2.106.955 ms | 2.107.439 ms | 2.109.853 ms | 2.110.829 ms | 1.569.458 us | 33.2294 mins |
-| SGD        |              |              |              |              |              |              | 1.579.690 us | 33.0592 mins |
+La duración del step 0 destaca respecto de las demás, ya que al principio del entrenamiento los primeros steps son de [calentamiento](https://medium.com/@MarkAiCode/mastering-pytorch-inference-time-measurement-22da0eaebab7) y llevan más tiempo de lo normal debido a factores como el **cache warming** o el **JIT compilation**.
 
 ### Tensorboard
 
-Al entrar en tensorboard podemos ver un resumen del entrenamiento. Se detalla información como la GPU utiliza (en este caso una NVIDIA A100) y su uso en % (90.32 en este caso), la duración de cada step desglosada en varias categorías (vemos como la ejecución de los kernels en la GPU fué lo más costoso con diferencia). Adicionalmente la herramienta otorga recomendaciones para mejorar el rendimiento del entrenamiento (como puede verse en la parte inferior para este entrenamiento no hay ninguna recomendación disponible).
+Al entrar en tensorboard podemos ver un resumen del entrenamiento. Se detalla información como la GPU utiliza (en este caso una NVIDIA A100) y su uso en % (90.32 en este caso), la duración de cada step desglosada en varias categorías (vemos como la ejecución de los kernels en la GPU fué lo más costoso con diferencia). 
+
+- La métrica de average time step no muestra el tiempo promedio **real** de cada step del entrenamiento, ya que tiene en cuenta un paso adicional en el que se invoca al método **cudaDeviceSynchronize** (bloquea la CPU hasta que todas las operaciones de la GPU hayan terminado), que tiende a bajar mucho la media.
+
+Adicionalmente la herramienta otorga recomendaciones para mejorar el rendimiento del entrenamiento (como puede verse en la parte inferior para este entrenamiento no hay ninguna recomendación disponible).
 
 ![image](https://github.com/user-attachments/assets/24c5e4dc-d062-49e6-a139-718b72025c8b)
 
@@ -149,9 +161,32 @@ El apartado GPU kernel muestra el tiempo de ejecución de cada kernel en la GPU 
 ![image](https://github.com/user-attachments/assets/f6101236-d30c-48f0-9a88-53b94b932acb)
 
 
-El apartado Trace devuelve información relacionada con el instante de ejecución de cada función del código del entrenamiento. Gracias a esta información podemos comprobar que el entrenamiento se ejecuta adecuadamente (se invoca al optimizador), el tiempo de cada epoch (Wall Duration de la ventana inferior que se muestra en la imagen), entre otra información relevante.
+El apartado Trace devuelve información relacionada con el instante de ejecución de cada función del código del entrenamiento. Gracias a esta información podemos comprobar que el entrenamiento se ejecuta adecuadamente (se invoca al optimizador), el tiempo de cada step (Wall Duration de la ventana inferior que se muestra en la imagen), entre otra información relevante.
 
-![TRACE](https://github.com/user-attachments/assets/9f6407fc-5f56-4775-af62-c1eea874052b)
+Si posicionamos el ratón en un bloque de funciones, pulsando w se pueden ampliar los detalles de la misma y se pueden reducir pulsando s.
+
+![TRACE](https://github.com/user-attachments/assets/d1cc9222-a391-4987-844c-e75e039ca8a8)
+
+Si navegamos entre los spans, podemos ver información de las fases de validación y de test.
+
+![EVAL](https://github.com/user-attachments/assets/858eee61-3c9f-4700-ab9c-4aade3e9b541)
+
+![TEST](https://github.com/user-attachments/assets/5f2400a7-1001-4744-bda7-72a51d3a2eea)
+
+Las capturas anteriores muestran la ejecución de las funciones en **un thread de la CPU**, si nos desplazamos hacia abajo en los datos podemos ver las ejecuciones de los threads asociados a las GPUs. Para las GPUs se muestran 2 apartados especiales, que son el valor de uso de la GPU en cada instante de tiempo y la eficiencia.
+
+![GPU](https://github.com/user-attachments/assets/d8e798ee-2366-484c-910f-a09634097c04)
+
+Si seleccionamos la opción "Flow Events" podemos ver a través de lineas de color verde la relación entre las operaciones realizadas por los threads de la CPU con la ejecución de los respectivos kernels en los threads de la GPU.
+
+![image](https://github.com/user-attachments/assets/b5ad5c77-681e-44db-808a-7a4af7176899)
+
+Otra pestaña con información útil es la de memoria. En ella podemos ver la ocupación de la memoria por dispositivo a lo largo del tiempo. La captura inferior nos muestra el uso de memoria de la GPU por instante de tiempo, que llega hasta un máximo de 33 GB de memoria ocupada, lo que indica que la GPU casi se queda sin espacio libre en el entrenamiento (por ejemplo al aumentar el tamaño de los batches, es importante tener en cuenta este dato para no provocar un error CUDA.OutOfMemory). El trazado azul nos informa de que se han producido picos de uso de memoria al principio de la ejecución de cada step (cada 2000 ms aproximadamente) y que en el resto del tiempo la memoria se infrautiliza.
+
+Debajo de la gráfica se muestra un listado con las funciones que han reservado memoria indicando la cantidad en KB y la duración de la reserva.
+
+![image](https://github.com/user-attachments/assets/42370bc7-2e51-4c8e-ab20-aab1e3fa73b7)
+
 
 ### Reassemble splited output files
 
