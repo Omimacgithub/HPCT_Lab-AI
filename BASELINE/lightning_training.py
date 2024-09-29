@@ -158,7 +158,7 @@ def main():
     print("------------------------------------------------------------")
     trainer.test(model, test_dataloader)
     #Save model
-    trainer.save_checkpoint("finetune-l-BERT-squad/BERT_checkpoint.ckpt")
+    #trainer.save_checkpoint("finetune-l-BERT-squad/BERT_checkpoint.ckpt")
 
 if __name__ == "__main__":
     main()
