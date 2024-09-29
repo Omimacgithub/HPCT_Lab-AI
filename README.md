@@ -123,7 +123,7 @@ deactivate
 
 ### Execution times
 
-En el directorio outputs se recogen 2 salidas del entrenamiento de BERT, 1 salida usando la optimización AdamW y la otra usando SGD. Se usó la siguiente configuración.
+Se recogen 2 salidas del entrenamiento de BERT, 1 salida usando la optimización AdamW y la otra usando SGD. Se usó la siguiente configuración.
 
 -  Fase de entrenamiento con 22500 filas del dataset de entrenamiento.
 	- Tamaño de batch de 150 (22500/150 = 150 steps)
@@ -153,3 +153,22 @@ El apartado Trace devuelve información relacionada con el instante de ejecució
 
 ![TRACE](https://github.com/user-attachments/assets/9f6407fc-5f56-4775-af62-c1eea874052b)
 
+### Reassemble splited output files
+
+Los archivos de salida de los entrenamientos ocupan en total en torno a unos **900 MB**:
+- 2 salidas por pantalla del código de entrenamiento, 1 con AdamW y otra con SGD
+- Archivos de profiling de los 2 entrenamientos para examinar con tensorboard
+- 1 checkpoint del entrenamiento final del modelo usando SGD (directorio version\_2).
+
+Como el tamaño máximo de ficheros permitido por GitHub es de 100MB se han fragmentado los ficheros. Para recomponer los archivos de salida es necesario realizar los siguientes pasos:
+
+Juntar los ficheros en 1 sólo zip.
+~~~shell
+cd outputs
+cat outputsa? > outputs.zip
+~~~
+
+Descomprimir el fichero final.
+~~~shell
+unzip outputs.zip
+~~~
