@@ -5,6 +5,17 @@ Git repository for AI lab
 - Omar Montenegro Macía
 - Álvaro Pardo Fente
 
+## Table of contents
+
+- [SQUAD](#squad)
+- [BERT](#bert)
+- [Explanation of the code](#explanation-of-the-code)
+- [How to run it?](#how-to-run-it)
+  - [Check training profile data](#check-training-profile-data)
+- [Profiling outputs](#profiling-outputs)
+	- [Execution times](#execution-times)
+ 	- [Tensorboard](#tensorboard)
+- [Reassemble splited output files](#reassemble-splited-output-files)
 ## SQUAD
 Este dataset nos proporciona un json con los siguientes campos significativos:
 
@@ -188,7 +199,7 @@ Debajo de la gráfica se muestra un listado con las funciones que han reservado 
 ![image](https://github.com/user-attachments/assets/42370bc7-2e51-4c8e-ab20-aab1e3fa73b7)
 
 
-### Reassemble splited output files
+## Reassemble splited output files
 
 Los archivos de salida de los entrenamientos ocupan en total en torno a unos **900 MB**:
 - 2 salidas por pantalla del código de entrenamiento, 1 con AdamW y otra con SGD
