@@ -1,8 +1,8 @@
 __pycache__
 .ipynb_checkpoints/
 tokenized_dataset/
-runs
+l_runs
 train-v2.0.json
 slurm*
 mypython/
-finetune-BERT-squad/
+finetune-l-BERT-squad/

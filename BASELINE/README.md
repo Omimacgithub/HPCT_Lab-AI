@@ -129,7 +129,7 @@ Para crear el venv (se crea en el directorio del repositorio, si ya se encuentra
 ./launch.sh
 ~~~
 
-La ejecución devuelve un fichero .out que contiene la duración en minutos del entrenamiento y un directorio **runs/BERTSQUAD** con la información de profiling.
+La ejecución devuelve un fichero .out que contiene la duración en minutos del entrenamiento y un directorio **l_runs/bert_lightning** con la información de profiling.
 
 ### Check training profile data
 
@@ -137,7 +137,7 @@ La ejecución devuelve un fichero .out que contiene la duración en minutos del 
 
 ~~~shell
 source ./mypython/bin/activate
-tensorboard --logdir=./runs --host `hostname -i` &
+tensorboard --logdir=./l_runs --host `hostname -i` &
 ~~~
 
 Accedemos desde el navegador web a la sección de profiling en tensorboard:
