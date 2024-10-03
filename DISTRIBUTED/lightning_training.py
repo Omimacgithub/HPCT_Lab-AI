@@ -103,7 +103,7 @@ def main():
         tokenized_datasets = load_from_disk(TOKENIZED_PATH)
 
     # Split data into train, val, test
-    train_dataset = tokenized_datasets["train"].select(range(22500))
+    train_dataset = tokenized_datasets["train"]
     val_dataset = tokenized_datasets["validation"].select(range(200))
     test_dataset = tokenized_datasets["validation"].select(range(5000, 5200))
 
@@ -124,15 +124,15 @@ def main():
     model = LanguageModel()
 
     # TensorBoard Logger
-    logger = TensorBoardLogger("l_runs", name="bert_lightning")
+    logger = TensorBoardLogger("z_runs", name="bert_lightning")
 
     # PyTorch Profiler
     profiler = PyTorchProfiler(
-        dirpath="l_runs/bert_lightning",
+        dirpath="z_runs/bert_lightning",
         filename="profiler",
         schedule=torch.profiler.schedule(wait=1, warmup=1, active=5, repeat=2),
         on_trace_ready=torch.profiler.tensorboard_trace_handler(
-            "l_runs/bert_lightning"
+            "z_runs/bert_lightning"
         ),
         record_shapes=True,
         profile_memory=True,
@@ -142,9 +142,12 @@ def main():
     # Trainer
     trainer = L.Trainer(
         accelerator="gpu",
-        devices=1,
+        devices=2,
+        num_nodes=2,
         #gradient_clip_val=0.25,
         max_epochs=6,
+        strategy="ddp",
+        #precision=16,  #speed-up the process
         logger=logger,  # Add the logger here
         profiler=profiler,  # Add the profiler here
         default_root_dir="finetune-l-BERT-squad"
