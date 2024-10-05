@@ -5,6 +5,8 @@
 - Álvaro Pardo Fente
 
 ## Table of contents
+- [How to run?](#how-to-run)
+- [DDP](#ddp)
 - [Profiling outputs](#profiling-outputs)
   - [Execution times](#execution-times)
  	- [Tensorboard](#tensorboard)
@@ -16,11 +18,9 @@ Como en el BASELINE, para crear el venv de python y ejecutar el entrenamiento di
 ./launch.sh
 ~~~
 
-## TODO: DDP?
-Los nodos se dividen el dataset y lo procesan por varias iteraciones del modelo completo. Para obtener el total global de los pesos calculados por cada worker, se puede seguir una de las siguientes estrategias:
-- Mirrored: se utiliza operaciones de comunicación colectivas como **all-reduce** (**aproximación síncrona**).
-- Parameter server: (**aproximación asíncrona**).
-Las desventajas de esta técnica son las **continuas sincronizaciones entre los workers** y la limitación de la memoria de la GPU ya que se debe de incluir el **modelo entero** en la memoria de cada worker (esto también limita el batch size).
+## DDP
+La estrategia elegida para el entrenamiento distribuido ha sido **DDP**. En esta estrategia los nodos se dividen los batches que conforman el dataset y los procesan por varias iteraciones del modelo completo. Para obtener el total global de los pesos calculados por cada worker, la implementación de DDP en pytorch_lightning usa la estrategia **Mirrored**, que utiliza operaciones de comunicación colectivas como **all-reduce**.
+- Las desventajas de esta técnica son las **continuas sincronizaciones entre los workers** y la limitación de la memoria de la GPU ya que se debe de incluir el **modelo entero** en la memoria de cada worker (esto también limita el batch size).
 
 ## Profiling outputs
 
@@ -33,6 +33,11 @@ Las desventajas de esta técnica son las **continuas sincronizaciones entre los 
 <tr><td colspan="1">SGD</td><td colspan="1"><a name="content"></a>2962,157 ms</td><td colspan="1"><a name="content1"></a>2143,035 ms</td><td colspan="1"><a name="content2"></a>2142,375 ms</td><td colspan="1"><a name="content3"></a>2135,773 ms</td><td colspan="1"><a name="content4"></a>2138,628 ms</td><td colspan="1"><a name="content5"></a>2140,032 ms</td><td colspan="1">2276,995 ms</td><td colspan="1">5,69 mins</td><td colspan="1">8,7387 mins (tiempo secuencial/4)</td></tr>
 </table>
 
+Los tiempos de step en la versión DDP son contando **sólo uno de los workers**.
+
+Puede apreciarse un ligero aumento del tiempo de ejecución en la versión distribuida, que se podría atribuir al aumento del número de las comunicaciones entre los workers al intercambiar datos. Sin embargo, en el tiempo final se refleja un notable decremento, concretamente se establece esta relación:
+
+$Tiempo DDP = Tiempo Secuencial/num Workers$
 
 ### Tensorboard
 
@@ -52,11 +57,10 @@ Continuando con la gráfica de la derecha, su objetivo es mostrar la eficiencia 
 - Transferencia de datos: tiempo invertido en intercambiar datos entre los workers.
 - Sincronización: duración de la espera de los workers por datos que necesitan de otros workers o a que estos terminen para continuar con su ejecución desde un punto de sincronización.
 
-En el caso de la captura, la gran mayoría del tiempo se invierte en la sincronización entre los workers, lo que indica una **ineficiencia** en las comunicaciones. Podría mejorarse el tiempo, por ejemplo usando más comunicaciones asíncronas en sustitución de las síncronas.
-- **TODO**: esto es un indicio de que se calcula el total global de los pesos **calculando la media**, lo que implica establecer un punto de sincronización entre todos los workers para comunicar los datos. Una mejora sería realizar estas sincronizaciones con menos frecuencia (lo que afecta a la precisión del modelo, **TODO**: probarla) o intercambiar los gradients.
+En el caso de la captura, la gran mayoría del tiempo se invierte en la sincronización entre los workers, lo que indica una **ineficiencia** en las comunicaciones. Como ya se mencionó, el entrenamiento distribuido utiliza la estrategia **mirrored**, que usa funciones de comunicación colectivas para propagar los cambios de los pesos. Estas funciones establecen **puntos de sincronización**. Una mejora sería realizar estas sincronizaciones con menos frecuencia (lo que afecta a la precisión del modelo, **TODO**: probarla) o intercambiar los gradients.
 
 Por último, se muestra un panel con todos los detalles relevantes acerca de la ejecución de las **funciones de comunicación usadas por worker**. Se muestra el nº de llamadas a dichas funciones, el tamaño de los mensajes compartidos, la latencia asociada a la transmisión y el tiempo de transferencia de los datos.
-- En la captura, se puede observar la ejecución de 2 funciones colectivas (broadcast y all_reduce) de la API **NCCL**, que es la implementación de NVIDIA de MPI. **TODO**: Esto indica que los workers están usando la estrategia **mirrored** para comunicar sus pesos y calcular el total global de estos.
+- En la captura, se puede observar la ejecución de 2 funciones colectivas (broadcast y all_reduce) de la API **NCCL**, que es la implementación de NVIDIA de MPI. 
 
 ![image](https://github.com/user-attachments/assets/70576066-0bc8-4747-b4bb-0d56efd772ec)
 
