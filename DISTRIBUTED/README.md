@@ -19,8 +19,9 @@ Como en el BASELINE, para crear el venv de python y ejecutar el entrenamiento di
 ~~~
 
 ## DDP
-La estrategia elegida para el entrenamiento distribuido ha sido **DDP**. En esta estrategia los nodos se dividen los batches que conforman el dataset y los procesan por varias iteraciones del modelo completo. Para obtener el total global de los pesos calculados por cada worker, la implementación de DDP en pytorch_lightning usa la estrategia **Mirrored**, que utiliza operaciones de comunicación colectivas como **all-reduce**.
-- Las desventajas de esta técnica son las **continuas sincronizaciones entre los workers** y la limitación de la memoria de la GPU ya que se debe de incluir el **modelo entero** en la memoria de cada worker (esto también limita el batch size).
+La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que es una estrategia sencilla y efectiva **si el modelo entero cabe en 1 sola GPU**. En DDP los nodos se dividen los batches que conforman el dataset y los procesan por varias iteraciones del modelo completo. Para obtener el total global de los pesos calculados por cada worker, la implementación de DDP en pytorch_lightning usa la estrategia **mirrored**, que utiliza operaciones de comunicación colectivas como **all-reduce**.
+- Las desventajas de esta técnica son las **continuas sincronizaciones entre los workers** (lo que consume gran parte del tiempo de comunicaciones) y la **poca escalabilidad**, ya que se debe de incluir el **modelo entero** en la memoria de cada worker, lo que limita el tamaño del modelo + el tamaño del batch a la memoria disponible en la GPU.
+  - DDP puede trabajar con el paralelismo **a nivel de modelo**, lo que permite superar la mencionada limitación.
 
 ## Profiling outputs
 
