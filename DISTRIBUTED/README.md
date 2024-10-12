@@ -6,6 +6,7 @@
 
 ## Table of contents
 - [How to run?](#how-to-run)
+- [Explanation of the code](#explanation-of-the-code)
 - [DDP](#ddp)
 - [Profiling outputs](#profiling-outputs)
   - [Execution times](#execution-times)
@@ -18,6 +19,24 @@ Como en el BASELINE, para crear el venv de python y ejecutar el entrenamiento di
 ./launch.sh
 ~~~
 
+**Para ver los datos generados con tensorboard**:
+
+~~~shell
+source ./mypython/bin/activate
+tensorboard --logdir=./l_runs --host `hostname -i` &
+http://<IP_del_nodo>:6006/#pytorch_profiler
+~~~
+
+## Explanation of the code
+
+Si el entrenamiento se encuentra implementado en pytorch_lightning, paralelizarlo mediante DDP es cuestión de poner 1 único parámetro nuevo a la clase trainer:
+
+https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/lightning_training.py#L149
+
+También es necesario controlar mediante 2 parámetros el nº de dispositivos y el nº de nodos que intervendrán en el entrenamiento (en la sección [Execution times](#execution-times) se explica más detalladamente):
+
+https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/lightning_training.py#L145-L146
+
 ## DDP
 La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que es una estrategia sencilla y efectiva **si el modelo entero cabe en 1 sola GPU**. En DDP los nodos se dividen los batches que conforman el dataset y los procesan por varias iteraciones del modelo completo. Para obtener el total global de los pesos calculados por cada worker, la implementación de DDP en pytorch_lightning usa la estrategia **mirrored**, que utiliza operaciones de comunicación colectivas como **all-reduce**.
 - Las desventajas de esta técnica son las **continuas sincronizaciones entre los workers** (lo que consume gran parte del tiempo de comunicaciones) y la **poca escalabilidad**, ya que se debe de incluir el **modelo entero** en la memoria de cada worker, lo que limita el tamaño del modelo + el tamaño del batch a la memoria disponible en la GPU.
@@ -26,6 +45,26 @@ La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que 
 ## Profiling outputs
 
 ### Execution times
+
+Se recogen 2 salidas del entrenamiento de BERT, 1 salida usando la optimización AdamW y la otra usando SGD. Se usó la siguiente configuración.
+
+- Fase de entrenamiento con 22500 filas del dataset de entrenamiento.
+  - Tamaño de batch de 150 (22500/150 = 150 steps)
+- Fase de validación con las 200 primeras filas del dataset de validación y test con las 200 últimas filas del dataset de validación.
+  - Tamaño de batch de 8 (200/8 = 25 steps)
+- 6 epochs.
+
+Cambiar la cantidad de GPUs(devices) y de nodos(num_nodes) es tan sencillo como cambiar 2 parámetros de la clase Trainer que nos proporciona pytorch_lightning:
+
+https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/lightning_training.py#L143-L146
+
+- Además, es necesario cambiar los parámetros correspondientes al **job.sbatch**:
+
+https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/job.sbatch#L2-L5
+
+- Línea 2: indica el nº de nodos del supercomputador que intervendrán en el proceso (equivale al parámetro **num_nodes**).
+- Línea 3: indica para cada nodo el nº de tareas a ejecutar (equivale al parámetro **devices**).
+- Línea 5: para solicitar el nº de GPUs por nodo. **En el FT3, a excepción de unos pocos nodos, la mayoría tienen un máximo de 2 GPUs A100**.
 
 <table><tr><th colspan="1"></th><th colspan="1"><b>Optimizers</b></th><th colspan="1"><b>Step 0</b></th><th colspan="1"><b>Step 1</b></th><th colspan="1"><b>Step 2</b></th><th colspan="1"><b>Step 3</b></th><th colspan="1"><b>Step 4</b></th><th colspan="1"><b>Step 5</b></th><th colspan="1"><b>Avg step</b></th><th colspan="1"><b>Avg epoch (150 steps)</b></th><th colspan="1"><b>Total exc</b></th></tr>
 <tr><td colspan="1" rowspan="2">Sequential</td><td colspan="1">AdamW</td><td colspan="1">2607,112 ms</td><td colspan="1">2115,140 ms</td><td colspan="1">2106,955 ms</td><td colspan="1">2107,439 ms</td><td colspan="1">2109,853 ms</td><td colspan="1">2110,829 ms</td><td colspan="1">2192,888 ms</td><td colspan="1">5,48222 mins</td><td colspan="1">33,2294 mins</td></tr>
@@ -39,6 +78,8 @@ Los tiempos de step en la versión DDP son contando **sólo uno de los workers**
 Puede apreciarse un ligero aumento del tiempo de ejecución en la versión distribuida, que se podría atribuir al aumento del número de las comunicaciones entre los workers al intercambiar datos. Sin embargo, en el tiempo final se refleja un notable decremento, concretamente se establece esta relación:
 
 $Tiempo DDP = Tiempo Secuencial/num Workers$
+
+Es decir, la duracción del entrenamiento se reduce de forma **lineal** según el nº de workers disponibles. Esta reducción en el tiempo puede aprovecharse para ampliar el tamaño del dataset a entrenar, por ejemplo por 4, de forma que tardaría lo mismo que el entrenamiento secuencial con un tamaño 4 veces menor del dataset. Sin embargo, **no puede aumentarse el tamaño de cada batch del entrenamiento**, ya que al ser DDP, se replica el modelo entero TODO: cuando mire lo de tensorboard con 2GPUs
 
 ### Tensorboard
 
@@ -65,4 +106,24 @@ Por último, se muestra un panel con todos los detalles relevantes acerca de la 
 
 ![image](https://github.com/user-attachments/assets/70576066-0bc8-4747-b4bb-0d56efd772ec)
 
-TODO: Si volvemos a la vista de memoria que analizamos previamente en el BASELINE, podemos ver que el consumo de memoria de la GPU sigue igual.
+TODO: (cuando mire lo de tensorboard con 2GPUs) Si volvemos a la vista de memoria que analizamos previamente en el BASELINE, podemos ver que el consumo de memoria de la GPU sigue igual.
+
+## Reassemble splited output files
+
+Los archivos de salida de los entrenamientos ocupan en total en torno a unos ** MB**:
+- 3 salidas por pantalla del código de entrenamiento con 1, 2 y 4 GPUs (todas usan SGD como optimizador).
+- Archivos de profiling de los 3 entrenamientos para examinar con tensorboard
+- 1 checkpoint del entrenamiento final del modelo usando 4 GPUs (directorio version\_0).
+
+Como el tamaño máximo de ficheros permitido por GitHub es de 100MB se han fragmentado los ficheros. Para recomponer los archivos de salida es necesario realizar los siguientes pasos:
+
+Juntar los ficheros en 1 sólo zip.
+~~~shell
+cd outputs
+cat outputsa? > outputs.zip
+~~~
+
+Descomprimir el fichero final.
+~~~shell
+unzip outputs.zip
+~~~
