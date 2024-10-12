@@ -10,7 +10,7 @@
 - [DDP](#ddp)
 - [Profiling outputs](#profiling-outputs)
   - [Execution times](#execution-times)
- 	- [Tensorboard](#tensorboard)
+  - [Tensorboard](#tensorboard)
 
 ## How to run?
 Como en el BASELINE, para crear el venv de python y ejecutar el entrenamiento distribuido lanzamos el siguiente script:
@@ -38,7 +38,7 @@ También es necesario controlar mediante 2 parámetros el nº de dispositivos y 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/lightning_training.py#L145-L146
 
 ## DDP
-La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que es una estrategia sencilla y efectiva **si el modelo entero cabe en 1 sola GPU**. En DDP los nodos se dividen los batches que conforman el dataset y los procesan por varias iteraciones del modelo completo. Para obtener el total global de los pesos calculados por cada worker, la implementación de DDP en pytorch_lightning usa la estrategia **mirrored**, que utiliza operaciones de comunicación colectivas como **all-reduce**.
+La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que es una estrategia sencilla y efectiva **si el modelo entero + tamaño del batch cabe en 1 sola GPU**. En DDP los nodos se dividen los batches que conforman el dataset y los procesan por varias iteraciones del modelo completo (paralelismo a nivel de datos) **cada uno de forma simultánea**. Para obtener el total global de los pesos calculados por cada worker, la implementación de DDP en pytorch_lightning usa la estrategia **mirrored**, que utiliza operaciones de comunicación colectivas como **all-reduce** para que todos los nodos obtengan el total global de estos pesos para continuar con la siguiente iteración del modelo.
 - Las desventajas de esta técnica son las **continuas sincronizaciones entre los workers** (lo que consume gran parte del tiempo de comunicaciones) y la **poca escalabilidad**, ya que se debe de incluir el **modelo entero** en la memoria de cada worker, lo que limita el tamaño del modelo + el tamaño del batch a la memoria disponible en la GPU.
   - DDP puede trabajar con el paralelismo **a nivel de modelo**, lo que permite superar la mencionada limitación.
 
@@ -46,10 +46,13 @@ La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que 
 
 ### Execution times
 
-Se recogen 2 salidas del entrenamiento de BERT, 1 salida usando la optimización AdamW y la otra usando SGD. Se usó la siguiente configuración.
+Se recogen 3 salidas del entrenamiento de BERT para DDP usando SGD usando 1, 2 y 4 GPUs y las 2 salidas anteriormente vistas en BASELINE. Se usó la siguiente configuración:
 
 - Fase de entrenamiento con 22500 filas del dataset de entrenamiento.
-  - Tamaño de batch de 150 (22500/150 = 150 steps)
+  - Tamaño de batch de 150 (22500/150 = 150 steps):
+    - Con 1 GPU: 150 de tamaño del batch por GPU (150/1)
+    - Con 2 GPUs: **75** de tamaño del batch por GPU (150/2)
+    - Con 4 GPUs: **38** de tamaño del batch por GPU (150/4=37,5 <- 3 GPUs tomaron 38 elementos y 1 GPU 36)
 - Fase de validación con las 200 primeras filas del dataset de validación y test con las 200 últimas filas del dataset de validación.
   - Tamaño de batch de 8 (200/8 = 25 steps)
 - 6 epochs.
