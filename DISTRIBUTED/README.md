@@ -11,6 +11,7 @@
 - [Profiling outputs](#profiling-outputs)
   - [Execution times](#execution-times)
   - [Tensorboard](#tensorboard)
+- [Reassemble splited output files](#reassemble-splited-output-files)
 
 ## How to run?
 Como en el BASELINE, para crear el venv de python y ejecutar el entrenamiento distribuido lanzamos el siguiente script:
@@ -120,6 +121,7 @@ Si volvemos a la vista de memoria que analizamos previamente en el BASELINE, cad
 
 Los archivos de salida de los entrenamientos ocupan en total en torno a unos **1,4 GB**:
 - 3 salidas por pantalla del código de entrenamiento con 1, 2 y 4 GPUs (todas usan SGD como optimizador).
+  - Al final muestran el tiempo de ejecución del entrenamiento y el valor de pérdida del test.
 - Archivos de profiling de los 3 entrenamientos para examinar con tensorboard
 - 1 checkpoint del entrenamiento final del modelo usando 4 GPUs (directorio version\_0).
 
@@ -141,3 +143,7 @@ Analizar los datos del profiler:
 ~~~shell
 tensorboard --logdir=./outputs --host `hostname -i` &
 ~~~
+
+Puede iniciarse un nuevo entrenamiento del modelo desde el checkpoint guardado en el directorio **outputs**, sólo es necesario comentar y descomentar las respectivas líneas:
+
+https://github.com/Omimacgithub/HPCT_Lab-AI/blob/63ffcdafec2e0b958fc53723995908cec7c011d0/DISTRIBUTED/lightning_training.py#L116-L119
