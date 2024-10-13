@@ -14,18 +14,7 @@ from transformers import (
 
 from tokenize_squad import TOKENIZED_PATH, get_tokenized_datasets
 
-try:
-    tokenized_datasets = load_from_disk(TOKENIZED_PATH)
-    print("Tokenized dataset found. Proceeding with training...")
-except FileNotFoundError:
-    print(
-        f"Tokenized dataset not found at {TOKENIZED_PATH}. Running tokenize-squad.py..."
-    )
-    tokenized_datasets = get_tokenized_datasets()
-    tokenized_datasets = load_from_disk(TOKENIZED_PATH)
-
 bert_model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased")
-
 
 class LanguageModel(L.LightningModule):
     def __init__(self):
@@ -85,7 +74,7 @@ class LanguageModel(L.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        #return AdamW(self.parameters(), lr=2e-5)
+        #return AdamW(self.parameters(), lr=1e-4)
         return torch.optim.SGD(self.parameters(), lr=0.01)
 
 
@@ -103,7 +92,7 @@ def main():
         tokenized_datasets = load_from_disk(TOKENIZED_PATH)
 
     # Split data into train, val, test
-    train_dataset = tokenized_datasets["train"]
+    train_dataset = tokenized_datasets["train"].select(range(22500))
     val_dataset = tokenized_datasets["validation"].select(range(200))
     test_dataset = tokenized_datasets["validation"].select(range(5000, 5200))
 
@@ -111,28 +100,34 @@ def main():
     data_collator = DefaultDataCollator()
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=150, shuffle=True, collate_fn=data_collator
+        train_dataset, batch_size=150,
+        shuffle=True, collate_fn=data_collator
+
     )
     val_dataloader = DataLoader(
-        val_dataset, batch_size=8, shuffle=False, collate_fn=data_collator
+        val_dataset, batch_size=8, 
+        shuffle=False, collate_fn=data_collator
     )
     test_dataloader = DataLoader(
-        test_dataset, batch_size=8, shuffle=False, collate_fn=data_collator
+        test_dataset, batch_size=8, 
+        shuffle=False, collate_fn=data_collator
     )
 
     # Model
     model = LanguageModel()
+    #Load model trained from checkpoint (train_loss=1.11)
+    #model = LanguageModel.load_from_checkpoint("outputs/version_0/checkpoints/epoch=5-step=228.ckpt")
 
     # TensorBoard Logger
-    logger = TensorBoardLogger("z_runs", name="bert_lightning")
+    logger = TensorBoardLogger("l_runs", name="bert_lightning")
 
     # PyTorch Profiler
     profiler = PyTorchProfiler(
-        dirpath="z_runs/bert_lightning",
+        dirpath="l_runs/bert_lightning",
         filename="profiler",
         schedule=torch.profiler.schedule(wait=1, warmup=1, active=5, repeat=2),
         on_trace_ready=torch.profiler.tensorboard_trace_handler(
-            "z_runs/bert_lightning"
+            "l_runs/bert_lightning"
         ),
         record_shapes=True,
         profile_memory=True,
@@ -147,6 +142,7 @@ def main():
         #gradient_clip_val=0.25,
         max_epochs=6,
         strategy="ddp",
+        #By default lightning uses nccl as backend if possible
         #precision=16,  #speed-up the process
         logger=logger,  # Add the logger here
         profiler=profiler,  # Add the profiler here
