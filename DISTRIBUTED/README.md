@@ -49,10 +49,7 @@ La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que 
 Se recogen 3 salidas del entrenamiento de BERT para DDP usando SGD usando 1, 2 y 4 GPUs y las 2 salidas anteriormente vistas en BASELINE. Se usó la siguiente configuración:
 
 - Fase de entrenamiento con 22500 filas del dataset de entrenamiento.
-  - Tamaño de batch de 150 (22500/150 = 150 steps):
-    - Con 1 GPU: 150 de tamaño del batch por GPU (150/1)
-    - Con 2 GPUs: **75** de tamaño del batch por GPU (150/2)
-    - Con 4 GPUs: **38** de tamaño del batch por GPU (150/4=37,5 <- 3 GPUs tomaron 38 elementos y 1 GPU 36)
+  - Tamaño de batch de 150
 - Fase de validación con las 200 primeras filas del dataset de validación y test con las 200 últimas filas del dataset de validación.
   - Tamaño de batch de 8 (200/8 = 25 steps)
 - 6 epochs.
@@ -79,11 +76,17 @@ https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21a
 
 Los tiempos de step en la versión DDP son contando **sólo uno de los workers**.
 
-Puede apreciarse un ligero aumento del tiempo de ejecución en la versión distribuida, que se podría atribuir al aumento del número de las comunicaciones entre los workers al intercambiar datos. Sin embargo, en el tiempo final se refleja un notable decremento, concretamente se establece esta relación:
+Puede apreciarse un ligero aumento del tiempo de ejecución en la versión distribuida, que se podría atribuir al aumento del número de las comunicaciones entre los workers al intercambiar datos. Sin embargo, en el tiempo final se refleja un notable decremento, concretamente se establece esta relación (**considerando el mismo tamaño del dataset y de los batches**):
 
-$Tiempo DDP = Tiempo Secuencial/num Workers$
+$$ Tiempo DDP = \frac{Tiempo Secuencial}{Num Workers} $$
 
-Es decir, la duracción del entrenamiento se reduce de forma **lineal** según el nº de workers disponibles. Esta reducción en el tiempo puede aprovecharse para ampliar el tamaño del dataset a entrenar, por ejemplo por 4, de forma que tardaría lo mismo que el entrenamiento secuencial con un tamaño 4 veces menor del dataset. Sin embargo, **no puede aumentarse el tamaño de cada batch del entrenamiento**, ya que al ser DDP, se replica el modelo entero TODO: cuando mire lo de tensorboard con 2GPUs
+Es decir, la duracción del entrenamiento se reduce de forma **lineal** según el nº de workers disponibles, también se establece la siguiente relación:
+
+$$ Steps Per Epoch = \frac{Filas Dataset}{Batch Size * Num Workers} $$
+
+Siendo **NumWorkers = nº de nodos * nº de dispositivos (GPUs)**.
+
+Acorde a esta relación, si aumentas el nº de workers que intervienen en el entrenamiento, menos steps tendrá cada epoch (22500/(150*4) = 37,5 steps), por lo tanto menos tiempo durará el proceso. Si aumentas el tamaño del dataset, más nº de steps habrá por epoch, por ende más durará el entrenamiento (por lo que se puede establecer un equilibrio entre aumentar el tamaño del dataset y el nº de los workers para mantener el tiempo de ejecución "estable"). El problema de DDP es que **no nos permite aumentar el tamaño del batch**, debido a que cada worker debe de albergar el **modelo entero + batch size en su GPU** (riesgo de un **CUDAOutOfMemory**).
 
 ### Tensorboard
 
@@ -110,11 +113,14 @@ Por último, se muestra un panel con todos los detalles relevantes acerca de la 
 
 ![image](https://github.com/user-attachments/assets/70576066-0bc8-4747-b4bb-0d56efd772ec)
 
-TODO: (cuando mire lo de tensorboard con 2GPUs) Si volvemos a la vista de memoria que analizamos previamente en el BASELINE, podemos ver que el consumo de memoria de la GPU sigue igual.
+Si volvemos a la vista de memoria que analizamos previamente en el BASELINE, cada worker consume la misma cantidad de memoria que en el entrenamiento secuencial con los mismos parámetros.
+
+![image](https://github.com/user-attachments/assets/23516621-8095-42b1-9907-4c7b4dcd8737)
+
 
 ## Reassemble splited output files
 
-Los archivos de salida de los entrenamientos ocupan en total en torno a unos ** MB**:
+Los archivos de salida de los entrenamientos ocupan en total en torno a unos ** 1,4 GB**:
 - 3 salidas por pantalla del código de entrenamiento con 1, 2 y 4 GPUs (todas usan SGD como optimizador).
 - Archivos de profiling de los 3 entrenamientos para examinar con tensorboard
 - 1 checkpoint del entrenamiento final del modelo usando 4 GPUs (directorio version\_0).
@@ -130,4 +136,10 @@ cat outputsa? > outputs.zip
 Descomprimir el fichero final.
 ~~~shell
 unzip outputs.zip
+~~~
+
+Analizar los datos del profiler:
+
+~~~shell
+tensorboard --logdir=./outputs --host `hostname -i` &
 ~~~
