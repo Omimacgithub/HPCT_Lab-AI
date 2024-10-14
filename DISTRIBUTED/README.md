@@ -23,7 +23,7 @@ Como en el BASELINE, para crear el venv de python y ejecutar el entrenamiento di
 **Para ver los datos generados con tensorboard**:
 
 ~~~shell
-source ./mypython/bin/activate
+source ../mypython/bin/activate
 tensorboard --logdir=./l_runs --host `hostname -i` &
 http://<IP_del_nodo>:6006/#pytorch_profiler
 ~~~
@@ -39,7 +39,7 @@ También es necesario controlar mediante 2 parámetros el nº de dispositivos y 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/lightning_training.py#L145-L146
 
 ## DDP
-La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que es una estrategia sencilla y efectiva **si el modelo entero + tamaño del batch cabe en 1 sola GPU**, además de que se encuentra implementado de **forma nativa** en pytorch_lightning. En DDP los nodos se dividen los batches que conforman el dataset y los procesan por varias iteraciones del modelo completo (paralelismo a nivel de datos) **cada uno de forma simultánea**. Para obtener el total global de los pesos calculados por cada worker, la implementación de DDP en pytorch_lightning usa la estrategia **mirrored**, que utiliza operaciones de comunicación colectivas como **all-reduce** para que todos los nodos obtengan el total global de estos pesos para continuar con la siguiente iteración del modelo.
+La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que es una estrategia sencilla y efectiva **si el modelo entero + tamaño del batch cabe en 1 sola GPU**, además de que se encuentra implementado de **forma nativa** en pytorch_lightning. En DDP los nodos se dividen el tamaño del dataset en batches del tamaño especificado y los procesan por varias iteraciones del modelo completo (paralelismo a nivel de datos) **cada uno de forma simultánea**. Para obtener el total global de los pesos, la implementación de DDP en pytorch_lightning usa la estrategia **mirrored**, que utiliza operaciones de comunicación colectivas como **all-reduce** para comunicar los gradientes a todos los workers. Finalmente, cada worker invoca al optimizador para actualizar los pesos y seguir con la siguiente iteración del entrenamiento.
 - Las desventajas de esta técnica son las **continuas sincronizaciones entre los workers** (lo que consume gran parte del tiempo de comunicaciones) y la **poca escalabilidad**, ya que se debe de incluir el **modelo entero** en la memoria de cada worker, lo que limita el tamaño del modelo + el tamaño del batch a la memoria disponible en la GPU.
   - DDP puede trabajar con el paralelismo **a nivel de modelo**, lo que permite superar la mencionada limitación.
 
@@ -56,7 +56,7 @@ Se recogen 3 salidas del entrenamiento de BERT para DDP con el optimizador **SGD
 - 6 epochs, la duración de un epoch **varía según el nº de los workers:**
   - 1 GPU: 150 steps
   - 2 GPUs: 75 steps (150/2)
-  - 4 GPUs: 37,5 steps (150/4)
+  - 4 GPUs: 37,5 steps (150/4, 38 steps en 3 GPUs y 36 en 1 GPU)
 - Semilla=42, **es importante inicializar una semilla para todos los workers, ya que sino puede dar lugar a pesos distintos entre modelos**.
 
 Cambiar la cantidad de GPUs(devices) y de nodos(num_nodes) es tan sencillo como cambiar 2 parámetros de la clase Trainer que nos proporciona pytorch_lightning:
@@ -85,7 +85,7 @@ $$ Steps Per Epoch = \frac{Filas Dataset}{Batch Size * Num Workers} $$
 
 Siendo **NumWorkers = nº de nodos * nº de dispositivos (GPUs)**.
 
-Acorde a esta relación, si se aumenta el nº de workers que intervienen en el entrenamiento, menos steps tendrá cada epoch (22500/(150*4) = 37,5 steps), por lo tanto menos tiempo durará el proceso. Si aumentas el tamaño del dataset, más nº de steps habrá por epoch, por ende más durará el entrenamiento (por lo que se puede establecer un equilibrio entre aumentar el tamaño del dataset y el nº de los workers para mantener el tiempo de ejecución "estable"). El problema de DDP es que **no nos permite aumentar el tamaño del batch**, debido a que cada worker debe de albergar el **modelo entero + batch size en su GPU** (riesgo de un **CUDAOutOfMemory**).
+Acorde a esta relación, si se aumenta el nº de workers que intervienen en el entrenamiento, menos steps tendrá cada epoch (22500/(150*4) = 37,5 steps), por lo tanto menos tiempo durará el proceso. Si se aumenta el tamaño del dataset, más nº de steps habrá por epoch, por ende más durará el entrenamiento (por lo que se puede establecer un equilibrio entre aumentar el tamaño del dataset y el nº de los workers para mantener el tiempo de ejecución "estable"). El problema de DDP es que **no nos permite aumentar el tamaño del batch**, debido a que cada worker debe de albergar el **modelo entero + batch size en su GPU** (riesgo de un **CUDAOutOfMemory**).
 
 ### Tensorboard
 
@@ -105,7 +105,7 @@ Continuando con la gráfica de la derecha, su objetivo es mostrar la eficiencia 
 - Transferencia de datos: tiempo invertido en intercambiar datos entre los workers.
 - Sincronización: duración de la espera de los workers por datos que necesitan de otros workers o a que estos terminen para continuar con su ejecución desde un punto de sincronización.
 
-En el caso de la captura, la gran mayoría del tiempo se invierte en la sincronización entre los workers, lo que indica una **ineficiencia** en las comunicaciones. Como ya se mencionó, el entrenamiento distribuido utiliza la estrategia **mirrored**, que usa funciones de comunicación colectivas para propagar los cambios de los pesos. Estas funciones establecen **puntos de sincronización**. Una mejora sería realizar estas sincronizaciones con menos frecuencia (lo que afecta a la precisión del modelo, **TODO**: probarla) o intercambiar los gradients.
+En el caso de la captura, la gran mayoría del tiempo se invierte en la sincronización entre los workers, lo que indica una **ineficiencia** en las comunicaciones. Como ya se mencionó, el entrenamiento distribuido utiliza la estrategia **mirrored**, que usa funciones de comunicación colectivas para propagar los gradientes. Estas funciones establecen **puntos de sincronización** en cada step para obtener los gradientes y actualizar los pesos del modelo para así continuar con el resto de steps. Una mejora sería realizar estas sincronizaciones con **menos frecuencia para reducir el tiempo de las comunicaciones**, lo que por contraparte **afecta a la precisión del modelo**.
 
 Por último, se muestra un panel con todos los detalles relevantes acerca de la ejecución de las **funciones de comunicación usadas por worker**. Se muestra el nº de llamadas a dichas funciones, el tamaño de los mensajes compartidos, la latencia asociada a la transmisión y el tiempo de transferencia de los datos.
 - En la captura, se puede observar la ejecución de 2 funciones colectivas (broadcast y all_reduce) de la API **NCCL**, que es la implementación de NVIDIA de MPI. 
@@ -141,7 +141,9 @@ unzip outputs.zip
 Analizar los datos del profiler:
 
 ~~~shell
-tensorboard --logdir=./outputs --host `hostname -i` &
+source ../../mypython/bin/activate
+tensorboard --logdir=. --host `hostname -i` &
+http://<IP_del_nodo>:6006/#pytorch_profiler
 ~~~
 
 Puede iniciarse un nuevo entrenamiento del modelo desde el checkpoint guardado en el directorio **outputs**, sólo es necesario comentar y descomentar las respectivas líneas:
