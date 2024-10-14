@@ -1,5 +1,6 @@
 from datasets import load_dataset
 from transformers import AutoTokenizer
+import os
 
 TOKENIZED_PATH = "tokenized_dataset"
 
@@ -97,5 +98,11 @@ def get_tokenized_datasets():
     tokenized_datasets.save_to_disk(TOKENIZED_PATH)
 
 if __name__ == "__main__":
-    get_tokenized_datasets()
+    if os.path.isdir(TOKENIZED_PATH):
+        print("Tokenized dataset found. Proceeding with training...")
+    else:
+        print(
+            f"Tokenized dataset not found at {TOKENIZED_PATH}. Running tokenize-squad.py..."
+        )
+        get_tokenized_datasets()
 

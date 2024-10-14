@@ -12,7 +12,7 @@ from transformers import (
     DefaultDataCollator,
 )
 
-from tokenize_squad import TOKENIZED_PATH, get_tokenized_datasets
+from tokenize_squad import TOKENIZED_PATH
 
 bert_model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased")
 
@@ -80,16 +80,7 @@ class LanguageModel(L.LightningModule):
 
 def main():
     L.seed_everything(42)
-
-    try:
-        tokenized_datasets = load_from_disk(TOKENIZED_PATH)
-        print("Tokenized dataset found. Proceeding with training...")
-    except FileNotFoundError:
-        print(
-            f"Tokenized dataset not found at {TOKENIZED_PATH}. Running tokenize-squad.py..."
-        )
-        get_tokenized_datasets()
-        tokenized_datasets = load_from_disk(TOKENIZED_PATH)
+    tokenized_datasets = load_from_disk(TOKENIZED_PATH)
 
     # Split data into train, val, test
     train_dataset = tokenized_datasets["train"].select(range(22500))

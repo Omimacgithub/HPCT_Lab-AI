@@ -12,4 +12,6 @@ export PYTHONFAULTHANDLER=1
 
 source ../mypython/bin/activate
 
+python3 tokenize_squad.py
+
 srun python3 lightning_training.py
