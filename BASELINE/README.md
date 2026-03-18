@@ -7,6 +7,7 @@ Git repository for AI lab
 
 ## Table of contents
 
+- [Objective](#objective)
 - [SQUAD](#squad)
 - [BERT](#bert)
 - [Explanation of the code](#explanation-of-the-code)
@@ -16,6 +17,10 @@ Git repository for AI lab
 	- [Execution times](#execution-times)
  	- [Tensorboard](#tensorboard)
 - [Reassemble splited output files](#reassemble-splited-output-files)
+
+## Objective
+El primer objetivo de esta práctica es el entrenamiento del modelo de BERT en una GPU **NVIDIA A100** del Finisterrae III para que logre responder a preguntas del dataset [SQUAD](https://rajpurkar.github.io/SQuAD-explorer/). El segundo objetivo es realizar un profiling del entrenamiento para analizar el tiempo de ejecución de cada una de las fases del mismo.
+
 ## SQUAD
 Este dataset nos proporciona un json con los siguientes campos significativos:
 
@@ -28,82 +33,84 @@ Este dataset nos proporciona un json con los siguientes campos significativos:
 ## BERT
 El objetivo es entrenar al modelo BERT para que dado un contexto **sepa responder correctamente** a las preguntas que se le hacen del tema relacionado con el contexto.
 
-Para este modelo son necesarias las siguientes entradas(features):
+Para este modelo son necesarias las siguientes entradas (features):
 
-- input\_ids: en esta entrada se introduce el context y las preguntas asociadas. Cada valor representa un índice que corresponde a la posición de una palabra en un wordlist que usa el modelo(proceso de tokenización de los datos).
-- attention\_mask: indica si el token es una máscara (0) o no (1).
+- **input\_ids**: en esta entrada se introduce el context y las preguntas asociadas. Cada valor representa un índice que corresponde a la posición de una palabra en un wordlist que usa el modelo(proceso de tokenización de los datos).
+- **attention\_mask**: indica si el token es una máscara (0) o no (1).
 
 Adicionalmente, crearemos 2 parámetros que el modelo usará a modo de salidas esperadas para calcular el valor de pérdida (loss):
 
-- start\_position: igual al campo **answer_start** del dataset.
-- end\_position: offset en nº de caracteres donde **termina** la respuesta incluida en el context.
+- **start\_position**: igual al campo **answer_start** del dataset.
+- **end\_position**: offset en nº de caracteres donde **termina** la respuesta incluida en el context.
 
-El modelo computa su respectivo start\_position (start\_logits) y end\_position (start\_logits) de la que cree que es la respuesta correcta y los compara con las salidas esperadas (calcula la pérdida).
+El modelo computa su respectivo start\_position (start\_logits) y end\_position (end\_logits) de la que cree que es la respuesta correcta y los compara con las salidas esperadas (calcula la pérdida).
 
 ## Explanation of the code
 
 El entrenamiento se divide en 2 ficheros:
 
-- tokenize\_squad.py: fichero que descarga el dataset y lo tokeniza para usarlo en el modelo de BERT.
+### tokenize\_squad.py
+
+Fichero que descarga el dataset y lo tokeniza para usarlo en el modelo de BERT.
+
+A continuación, se explican los aspectos más relevantes del código.
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/tokenize_squad.py#L91
 
--
-	- Transforma (tokeniza) los campos "question" y "context" en input\_ids válidos para el modelo de BERT (dado que la información del context puede ser demasiado extensa y el tamaño de los input\_ids de BERT es limitado, es necesario fragmentarla en varios inputs\_ids).
+- Carga el dataset descargado bajo el directorio [**squad**](https://rajpurkar.github.io/SQuAD-explorer/).
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/e08493c0974d60973cd5d46d5d22d86f97b40425/BASELINE/tokenize_squad.py#L14-L23
 
--
-	- Computa los campos start\_position y end\_position que serán usados por BERT para calcular el valor de loss.
-		- offsets: array que dada una posición de un token devuelve la letra a la que está asociado
-  		- token_start_index: posición del token que corresponde a la primera letra del fragmento del contexto que responde a una pregunta.
-    		- token_end_index: lo mismo que la anterior variable pero para la posición de la última letra del fragmento.
+- Transforma (tokeniza) los campos "question" y "context" en input\_ids válidos para el modelo de BERT (dado que la información del context puede ser demasiado extensa y el tamaño de los input\_ids de BERT es limitado, es necesario fragmentarla en varios inputs\_ids).
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/e08493c0974d60973cd5d46d5d22d86f97b40425/BASELINE/tokenize_squad.py#L48-L86
 
--
-	- Devuelve un objeto datasets.arrow\_dataset.Dataset con todas las entradas necesarias para el modelo y lo guarda en un fichero.
+- Computa los campos start\_position y end\_position que serán usados por BERT para calcular el valor de loss.
+	- **offsets**: array que dada una posición de un token devuelve la letra a la que está asociado.
+	- **token_start_index**: posición del token que corresponde a la primera letra del fragmento del contexto que responde a una pregunta.
+	- **token_end_index**: lo mismo que la anterior variable pero para la posición de la última letra del fragmento.
+
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/tokenize_squad.py#L93-L97
 
-- lightning_training.py: crea la clase que ejecuta el entrenamiento del modelo de BERT y genera información de profiling del mismo.
-	- Se define la clase como un LightningModule con el modelo. Debe de implementar los siguientes métodos:
- 		- forward: invoca al modelo BERT con los parámetros (features) necesarios.
+- Devuelve un objeto datasets.arrow\_dataset.Dataset con todas las entradas necesarias para el modelo y lo guarda en un fichero.
+
+### lightning\_training.py
+
+Script que carga los datos tokenizados y ejecuta el entrenamiento del modelo de BERT en Pytorch Lightning. También genera información de profiling del entrenamiento.
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L35-L38
 
--
-	-
-		- training\_step: Devuelve el valor de pérdida generado en el step de entrenamiento. Llama a la función forward, que devuelve las salidas generadas por el modelo (start\_logits y end\_logits), de las que se calcula el valor de pérdida respecto a las salidas esperadas (start\_positions y end\_positions). Al usar pytorch\_lightning no es necesario declarar métodos como optimizer.step() o optimizer.zero_grad() en el entrenamiento.
- 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L40-L54
-
--
-	-
-		- validation_step y test_step en caso de que se quiera realizar estas fases, ejecutan el mismo código que la fase de training.
-  		- configure_optimizers: devuelve los optimizadores que se usarán en el entrenamiento (sólo SGD) y los schedulers que modifican el valor del learning rate (en este caso ninguno).
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/e08493c0974d60973cd5d46d5d22d86f97b40425/BASELINE/lightning_training.py#L87-L89
 
--
-	- La primera linea del main establece una semilla **fija** para que el entrenamiento **siempre produzca los mismos resultados** sin importar el nº de ejecuciones.
+- Se define la clase como un LightningModule con el modelo. Debe de implementar los siguientes métodos:
+	- **forward**: invoca al modelo BERT con los parámetros (features) necesarios.
+	- **training\_step**: Devuelve el valor de pérdida generado en el step de entrenamiento. Llama a la función forward, que devuelve las salidas generadas por el modelo (start\_logits y end\_logits), de las que se calcula el valor de pérdida respecto a las salidas esperadas (start\_positions y end\_positions).
+	- **validation\_step y test_step** en caso de que se quiera realizar estas fases, ejecutan el mismo código que la fase de training.
+	- **configure\_optimizers**: devuelve los optimizadores que se usarán en el entrenamiento (sólo SGD) y los schedulers que modifican el valor del learning rate (en este caso ninguno).
+
+> [!NOTE]
+> Al utilizar Pytorch Lightning, no es necesario declarar métodos como optimizer.step() o optimizer.zero_grad() en el entrenamiento.
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/e08493c0974d60973cd5d46d5d22d86f97b40425/BASELINE/lightning_training.py#L92-L93
 
--
-	- Carga el Dataset creado del anterior archivo .py (o genera uno si no está creado).
+- La primera linea del main establece una semilla **fija** para que el entrenamiento **siempre produzca los mismos resultados** sin importar el nº de ejecuciones.
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L95-L103
 
--
-	- Carga el Dataset en un objeto DataLoader para poder iterarlo en batches.
-		- **Es necesario** especificar para cada DataLoader un DefaultDataCollator(), ya que al trabajar con batches se espera siempre un tamaño de los datos **fijo**, algo que no ocurre cuando se trabaja con textos.
-  			- Esta clase fija el tamaño de cada input a la secuencia de texto más larga del dataset, añadiendo relleno (padding) al resto de inputs para que se adecuen a esa longitud.
+- Carga el Dataset creado del anterior archivo .py (o genera uno si no está creado).
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L111-L121
 
--
-	- Crea un objeto PyTorchProfiler con los argumentos necesarios:
+- Carga el Dataset en un objeto DataLoader para poder iterarlo en batches.
+	- **Es necesario** especificar para cada DataLoader un DefaultDataCollator(), ya que al trabajar con batches se espera siempre un tamaño de los datos **fijo**, algo que no ocurre cuando se trabaja con textos.
+  	- Esta clase fija el tamaño de cada input a la secuencia de texto más larga del dataset, añadiendo relleno (padding) al resto de inputs para que se adecuen a esa longitud.
+
+https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L130-L140
+
+- Crea un objeto PyTorchProfiler con los argumentos necesarios:
 		- **schedule:** decide que acción del profiler ejecutar en cada paso (step)
 			- wait: el profiler se deshabilita
 			- warmup: el profiler graba información, pero los resultados son descartados
@@ -111,13 +118,9 @@ https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7
    			- repeat: la secuencia formada por los 3 parámetros anteriores se repite las veces que el programador indique (en este caso 2, las repeticiones se dividen en spans al momento de ver la información en tensorboard).
                 - **on_trace_ready:** es un hook que se activa cuando el scheduler devuelve ProfilerAction.RECORD_AND_SAVE (que es cuando se acaban todos los pasos del profiler wait+warmup+active). En este caso la acción que ejecuta es la de guardar los resultados en el directorio declarado.
 
-https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L130-L140
-
--
-	- Ejecuta el bucle de entrenamiento al mismo tiempo que guarda la información de profiling y calcula el tiempo en minutos de la fase de entrenamiento.
-
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/e08493c0974d60973cd5d46d5d22d86f97b40425/BASELINE/lightning_training.py#L142-L159
 
+- Ejecuta el bucle de entrenamiento al mismo tiempo que guarda la información de profiling y calcula el tiempo en minutos de la fase de entrenamiento.
 
 ## How to run it?
 
