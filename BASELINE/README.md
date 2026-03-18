@@ -19,7 +19,7 @@ Git repository for AI lab
 - [Reassemble splited output files](#reassemble-splited-output-files)
 
 ## Objective
-El primer objetivo de esta práctica es el entrenamiento del modelo de BERT en una GPU **NVIDIA A100** del Finisterrae III para que logre responder a preguntas del dataset [SQUAD](https://rajpurkar.github.io/SQuAD-explorer/). El segundo objetivo es realizar un profiling del entrenamiento para analizar el tiempo de ejecución de cada una de las fases del mismo.
+El primer objetivo de esta práctica consiste en el entrenamiento del modelo de BERT, utilizando una GPU **NVIDIA A100** del Finisterrae III, para que logre responder a preguntas del dataset [SQUAD](https://rajpurkar.github.io/SQuAD-explorer/). El segundo objetivo es realizar un profiling del entrenamiento para analizar el tiempo de ejecución de cada una de las fases del mismo.
 
 ## SQUAD
 Este dataset nos proporciona un json con los siguientes campos significativos:
