@@ -9,7 +9,7 @@ Git repository for AI lab
 
 - [Objective](#objective)
 - [SQUAD](#squad)
-- [BERT](#bert)
+- [Entradas y salidas definidas para BERT](#entradas-y-salidas-definidas-para-bert)
 - [Explanation of the code](#explanation-of-the-code)
 - [How to run it?](#how-to-run-it)
   - [Check training profile data](#check-training-profile-data)
@@ -19,7 +19,9 @@ Git repository for AI lab
 - [Reassemble splited output files](#reassemble-splited-output-files)
 
 ## Objective
-El primer objetivo de esta práctica consiste en el entrenamiento del modelo de BERT, utilizando una GPU **NVIDIA A100** del Finisterrae III, para que logre responder a preguntas del dataset [SQUAD](https://rajpurkar.github.io/SQuAD-explorer/). El segundo objetivo es realizar un profiling del entrenamiento para analizar el tiempo de ejecución de cada una de las fases del mismo.
+El primer objetivo de esta práctica consiste en el entrenamiento del modelo de BERT, utilizando una GPU **NVIDIA A100** del Finisterrae III, para que logre responder a preguntas del dataset [SQUAD](https://rajpurkar.github.io/SQuAD-explorer/). 
+
+En este README se exponen comentarios en detalle del código desarrollado, se muestran los pasos para ejecutar el entrenamiento y se realiza un análisis de rendimiento del mismo por medio de información de profiling.
 
 ## SQUAD
 Este dataset nos proporciona un json con los siguientes campos significativos:
@@ -30,7 +32,7 @@ Este dataset nos proporciona un json con los siguientes campos significativos:
 	- text: respuesta a la pregunta (información para el dataset de test)
 	- answer\_start: offset en nº de caracteres donde comienza la respuesta incluida en el context (información para el dataset de test).
 
-## BERT
+## Entradas y salidas definidas para BERT
 El objetivo es entrenar al modelo BERT para que dado un contexto **sepa responder correctamente** a las preguntas que se le hacen del tema relacionado con el contexto.
 
 Para este modelo son necesarias las siguientes entradas (features):
@@ -73,11 +75,15 @@ https://github.com/Omimacgithub/HPCT_Lab-AI/blob/e08493c0974d60973cd5d46d5d22d86
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/tokenize_squad.py#L93-L97
 
-- Devuelve un objeto datasets.arrow\_dataset.Dataset con todas las entradas necesarias para el modelo y lo guarda en un fichero.
+- Devuelve un objeto *datasets.arrow\_dataset.Dataset* con todas las entradas necesarias para el modelo y lo guarda en un fichero.
 
 ### lightning\_training.py
 
-Script que carga los datos tokenizados y ejecuta el entrenamiento del modelo de BERT en Pytorch Lightning. También genera información de profiling del entrenamiento.
+Script que carga los datos tokenizados y ejecuta el entrenamiento del modelo de BERT en **Pytorch Lightning**. También genera información de profiling del entrenamiento.
+
+https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L27-L33
+
+- Partimos de una versión de BERT creada y entrenada en el framework **transformers**. Creamos una clase que hereda del módulo LightningModule de Pytorch Lightning, de esta forma la clase **LanguageModel** representa a nuestro modelo de BERT, en la que implementamos las funciones forward, eval, entre otras.
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L35-L38
 
@@ -85,7 +91,7 @@ https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/e08493c0974d60973cd5d46d5d22d86f97b40425/BASELINE/lightning_training.py#L87-L89
 
-- Se define la clase como un LightningModule con el modelo. Debe de implementar los siguientes métodos:
+- Hemos implementado los siguientes métodos correspondientes a una clase que herede de LightningModule:
 	- **forward**: invoca al modelo BERT con los parámetros (features) necesarios.
 	- **training\_step**: Devuelve el valor de pérdida generado en el step de entrenamiento. Llama a la función forward, que devuelve las salidas generadas por el modelo (start\_logits y end\_logits), de las que se calcula el valor de pérdida respecto a las salidas esperadas (start\_positions y end\_positions).
 	- **validation\_step y test_step** en caso de que se quiera realizar estas fases, ejecutan el mismo código que la fase de training.
@@ -110,13 +116,13 @@ https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/c8d5ed2a8e86acc0589b1808e0482d7645e845cf/lightning_training.py#L130-L140
 
-- Crea un objeto PyTorchProfiler con los argumentos necesarios:
-		- **schedule:** decide que acción del profiler ejecutar en cada paso (step)
-			- wait: el profiler se deshabilita
-			- warmup: el profiler graba información, pero los resultados son descartados
-			- active: el profiler graba información y guarda los resultados
-   			- repeat: la secuencia formada por los 3 parámetros anteriores se repite las veces que el programador indique (en este caso 2, las repeticiones se dividen en spans al momento de ver la información en tensorboard).
-                - **on_trace_ready:** es un hook que se activa cuando el scheduler devuelve ProfilerAction.RECORD_AND_SAVE (que es cuando se acaban todos los pasos del profiler wait+warmup+active). En este caso la acción que ejecuta es la de guardar los resultados en el directorio declarado.
+- Crea un objeto PyTorchProfiler con los argumentos necesarios, destacamos los siguientes:
+	- **schedule:** decide que acción del profiler ejecutar en cada paso (step)
+		- wait: el profiler se deshabilita
+		- warmup: el profiler graba información, pero los resultados son descartados
+		- active: el profiler graba información y guarda los resultados
+   		- repeat: la secuencia formada por los 3 parámetros anteriores se repite las veces que el programador indique (en este caso 2, las repeticiones se dividen en spans al momento de ver la información en tensorboard).
+	- **on_trace_ready:** es un hook que se activa cuando el scheduler devuelve ProfilerAction.RECORD_AND_SAVE (que es cuando se acaban todos los pasos del profiler wait+warmup+active). En este caso la acción que ejecuta es la de guardar los resultados en el directorio declarado.
 
 https://github.com/Omimacgithub/HPCT_Lab-AI/blob/e08493c0974d60973cd5d46d5d22d86f97b40425/BASELINE/lightning_training.py#L142-L159
 
