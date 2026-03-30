@@ -130,7 +130,8 @@ https://github.com/Omimacgithub/HPCT_Lab-AI/blob/e08493c0974d60973cd5d46d5d22d86
 
 ## How to run it?
 
-**NOTA:** la visualización de la información de profiling en tensorboard **no está soportada para el navegador Safari**.
+>[!WARNING]
+>La visualización de la información de profiling en tensorboard **no está soportada para el navegador Safari**.
 
 Para crear el venv (se crea en el directorio del repositorio, si ya se encuentra creado se omite este paso) y lanzar el trabajo para entrenar el modelo ejecutamos el script **launch.sh**:
 
