@@ -7,11 +7,32 @@
 ## Table of contents
 - [How to run?](#how-to-run)
 - [Explanation of the code](#explanation-of-the-code)
-- [DDP](#ddp)
+- [Estrategia de distribución del entrenamiento](#estrategia-de-distribucion-del-entrenamiento)
 - [Profiling outputs](#profiling-outputs)
   - [Execution times](#execution-times)
   - [Tensorboard](#tensorboard)
 - [Reassemble splited output files](#reassemble-splited-output-files)
+
+## Objective
+
+Tras obtener un código de fine-tuning en Pytorch Lightning del modelo de BERT (BASELINE), el siguiente objetivo es **paralelizar** el entrenamiento para reducir los **33 minutos** obtenidos tras entrenar el modelo en 1 GPU NVIDIA A100. Para conseguir dicho objetivo, contamos con **2 nodos del Finisterrae III, cada uno con 2 GPUs NVIDIA A100**, en el que ejecutaremos una **estrategia de distribución del entrenamiento** para repartir el trabajo entre múltiples máquinas (o workers).
+
+## Estrategia de distribución del entrenamiento
+La estrategia elegida ha sido **Distributed Data Parallel (DDP)**, ya que es sencilla y efectiva **si el modelo entero + tamaño del batch cabe en 1 sola GPU**, además de que se encuentra implementado de **forma nativa** en Pytorch Lightning. En Distributed Data Parallel, los nodos se dividen el tamaño del dataset en batches del tamaño especificado y los procesan por varias iteraciones del modelo completo (paralelismo a nivel de datos) **cada uno de forma simultánea**. 
+
+Para obtener la suma total de los pesos del modelo, la implementación de DDP en Pytorch Lightning usa la estrategia **mirrored**, que aplica operaciones de comunicación colectivas como **all-reduce** para comunicar los gradientes a todos los workers. Finalmente, cada worker invoca al optimizador para actualizar los pesos y seguir con la siguiente iteración del entrenamiento.
+
+La principal limitación de DDP es que **no es escalable**, puesto a que se debe de incluir todos los parámetros del modelo y el batch de entrada en la memoria de cada worker (GPU en este caso). La estrategia **Fully Sharded Data Parallel (FSDP)** permite distribuir los parámetros del modelo entre los workers, lo que otorga una **mayor escalabilidad**. Por otro lado, el número de comunicaciones con FSDP **aumenta** respecto a DDP, aunque estas se pueden "ocultar" si se solapan con el tiempo de computación.
+
+## Explanation of the code
+
+Si el entrenamiento se encuentra implementado en pytorch_lightning, paralelizarlo mediante DDP es cuestión de poner 1 único parámetro nuevo a la clase trainer:
+
+https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/lightning_training.py#L149
+
+También es necesario controlar mediante 2 parámetros el nº de dispositivos y el nº de nodos que intervendrán en el entrenamiento (en la sección [Execution times](#execution-times) se explica más detalladamente):
+
+https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/lightning_training.py#L145-L146
 
 ## How to run?
 Como en el BASELINE, para crear el venv de python y ejecutar el entrenamiento distribuido lanzamos el siguiente script:
@@ -27,21 +48,6 @@ source ../mypython/bin/activate
 tensorboard --logdir=./l_runs --host `hostname -i` &
 http://<IP_del_nodo>:6006/#pytorch_profiler
 ~~~
-
-## Explanation of the code
-
-Si el entrenamiento se encuentra implementado en pytorch_lightning, paralelizarlo mediante DDP es cuestión de poner 1 único parámetro nuevo a la clase trainer:
-
-https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/lightning_training.py#L149
-
-También es necesario controlar mediante 2 parámetros el nº de dispositivos y el nº de nodos que intervendrán en el entrenamiento (en la sección [Execution times](#execution-times) se explica más detalladamente):
-
-https://github.com/Omimacgithub/HPCT_Lab-AI/blob/d091510cfc63e0aceca3c88931be21ad1eaac66c/DISTRIBUTED/lightning_training.py#L145-L146
-
-## DDP
-La estrategia elegida para el entrenamiento distribuido ha sido **DDP**, ya que es una estrategia sencilla y efectiva **si el modelo entero + tamaño del batch cabe en 1 sola GPU**, además de que se encuentra implementado de **forma nativa** en pytorch_lightning. En DDP los nodos se dividen el tamaño del dataset en batches del tamaño especificado y los procesan por varias iteraciones del modelo completo (paralelismo a nivel de datos) **cada uno de forma simultánea**. Para obtener el total global de los pesos, la implementación de DDP en pytorch_lightning usa la estrategia **mirrored**, que utiliza operaciones de comunicación colectivas como **all-reduce** para comunicar los gradientes a todos los workers. Finalmente, cada worker invoca al optimizador para actualizar los pesos y seguir con la siguiente iteración del entrenamiento.
-- Las desventajas de esta técnica son las **continuas sincronizaciones entre los workers** (lo que consume gran parte del tiempo de comunicaciones) y la **poca escalabilidad**, ya que se debe de incluir el **modelo entero** en la memoria de cada worker, lo que limita el tamaño del modelo + el tamaño del batch a la memoria disponible en la GPU.
-  - DDP puede trabajar con el paralelismo **a nivel de modelo**, lo que permite superar la mencionada limitación.
 
 ## Profiling outputs
 
