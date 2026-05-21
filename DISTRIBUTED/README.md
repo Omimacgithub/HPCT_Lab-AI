@@ -1,4 +1,4 @@
-# Fine-tuning BERT model for question answering with SQUAD dataset / DISTRIBUTED
+# Profiling overview of BERT fine-tuning for question answering with SQUAD dataset / DISTRIBUTED
 
 ## Colaborators
 - Omar Montenegro Macía
