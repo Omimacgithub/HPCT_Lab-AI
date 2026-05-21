@@ -1,4 +1,4 @@
-# HPCT - Lab-AI / Fine-tuning BERT model for question answering with SQUAD dataset
+# HPCT - Lab-AI / Profiling overview of BERT fine-tuning for question answering with SQUAD dataset
 Git repository for AI lab
 
 ## Colaborators
