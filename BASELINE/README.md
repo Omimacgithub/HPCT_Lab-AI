@@ -1,4 +1,4 @@
-# Fine-tuning BERT model for question answering with SQUAD dataset / BASELINE
+# Profiling overview of BERT fine-tuning for question answering with SQUAD dataset / BASELINE
 Git repository for AI lab
 
 ## Colaborators
@@ -183,7 +183,7 @@ La duración del step 0 destaca respecto de las demás, ya que al principio del 
 
 ### Tensorboard
 
-Al entrar en tensorboard podemos ver un resumen del entrenamiento. Se detalla información como la GPU utiliza (en este caso una NVIDIA A100) y su uso en % (90.32 en este caso), la duración de cada step desglosada en varias categorías (vemos como la ejecución de los kernels en la GPU fué lo más costoso con diferencia). 
+Al entrar en tensorboard podemos ver un resumen del entrenamiento. En la sección *GPU Summary*, se detalla información como las características de la GPU y su utilización en % (90.32 en este caso, lo que indica que la GPU se está exprimiendo adecuadamente). Continuando por la derecha, vemos la sección *Execution Summary* con el resumen del tiempo de ejecución promedio de un step, que se encuentra desglosado en varias categorías (vemos como la ejecución de los kernels en la GPU fué lo más costoso con diferencia). 
 
 - La métrica de average time step no muestra el tiempo promedio **real** de cada step del entrenamiento, ya que tiene en cuenta un paso adicional en el que se invoca al método **cudaDeviceSynchronize** (bloquea la CPU hasta que todas las operaciones de la GPU hayan terminado), que tiende a bajar mucho la media.
 
